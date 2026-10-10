@@ -292,7 +292,9 @@ function renderCaptcha() {
   }
 }
 function renderUsername() {
-  let unavailable = '';
+  const unavailable = new Set();
+  let setbacks = 0;
+  let checkedName = '';
   frame('Choose your username','A unique name helps everyone know it is you.',`
     <form id="usernameForm" novalidate>
       <div class="field"><label for="username">Username</label><div class="handle-input"><span aria-hidden="true">@</span><input id="username" type="text" placeholder="Your username" autocomplete="off" maxlength="18" spellcheck="false" required></div></div>
@@ -303,23 +305,54 @@ function renderUsername() {
   const form=panel.querySelector('#usernameForm');
   const input=panel.querySelector('#username');
   const status=panel.querySelector('#availability');
+  const button=form.querySelector('button[type="submit"]');
+  const suggest=(value,suffix)=>`${value.replace(/_[23]$/,'').slice(0,16)}_${suffix}`;
+  const showTaken=(message,suggestion)=>{
+    status.className='availability visible';
+    status.innerHTML=`<strong>${message}</strong><span>Perhaps this one will work:</span><button type="button" class="suggestion" id="suggestHandle"></button>`;
+    status.querySelector('#suggestHandle').textContent=`@${suggestion}`;
+    status.querySelector('#suggestHandle').addEventListener('click',()=>{input.value=suggestion;input.focus();notice('Suggestion added. Check availability again.','info');});
+    button.textContent='Check availability';
+    checkedName='';
+  };
+  input.addEventListener('input',()=>{
+    if(checkedName && input.value.trim().toLowerCase()!==checkedName){
+      checkedName='';
+      status.className='availability';
+      status.textContent='';
+      button.textContent='Check availability';
+    }
+  });
   form.addEventListener('submit',event=>{
     event.preventDefault();
     const value=input.value.trim();
     if(!/^[A-Za-z0-9_]{4,18}$/.test(value)) return notice('Use 4–18 letters, numbers, or underscores.');
-    if(!unavailable){
-      unavailable=value.toLowerCase();
-      const suggestion=`${value.slice(0,16)}_2`;
-      status.innerHTML=`<strong>That username is already taken.</strong><span>Every good one is. Try a suggested alternative:</span><button type="button" class="suggestion" id="suggestHandle"></button>`;
-      status.classList.add('visible');
-      status.querySelector('#suggestHandle').textContent=`@${suggestion}`;
-      status.querySelector('#suggestHandle').addEventListener('click',()=>{input.value=suggestion;input.focus();notice('Suggestion added. Check availability again.','info');});
+    const normalised=value.toLowerCase();
+    if(unavailable.has(normalised)) return notice('That name is still unavailable. Please choose a different one.');
+    if(checkedName===normalised){
+      if(setbacks===1){
+        setbacks=2;
+        unavailable.add(normalised);
+        showTaken('Sorry, someone claimed it while you were confirming.',suggest(value,3));
+        notice('Availability changed. Please choose another username.','info');
+        return;
+      }
+      chosenHandle=value;
+      moveTo('code');
+      return;
+    }
+    if(setbacks===0){
+      setbacks=1;
+      unavailable.add(normalised);
+      showTaken('That username is already taken.',suggest(value,2));
       notice('Sorry, somebody got there first.','info');
       return;
     }
-    if(value.toLowerCase()===unavailable) return notice('Still taken. Please choose a different username.');
-    chosenHandle=value;
-    moveTo('code');
+    checkedName=normalised;
+    status.className='availability visible available';
+    status.innerHTML='<strong>Good news. This username is available.</strong><span>Please confirm before it disappears.</span>';
+    button.textContent='Reserve username';
+    notice('Available for now.','info');
   });
 }
 function renderCode() {
@@ -505,9 +538,14 @@ function renderWaiting() {
     });
   }
   const phases = [
-    {duration:6200, start:0, end:23, caption:'Carefully getting started...'},
-    {duration:1700, start:23, end:82, caption:'Oh, now we’re moving.'},
-    {duration:7900, start:82, end:99, caption:'Just one last tiny thing...'}
+    {duration:4800, start:0, end:24, caption:'Carefully getting started...'},
+    {duration:1300, start:24, end:94, caption:'Oh, now we’re moving.'},
+    {duration:4200, start:94, end:99, caption:'Almost finished...'},
+    {duration:1900, start:99, end:99, caption:'Just a moment at 99%...'},
+    {duration:900, start:99, end:78, caption:'Rechecking a few things...'},
+    {duration:3300, start:78, end:96, caption:'Reconfirming your preferences...'},
+    {duration:4300, start:96, end:99, caption:'This is taking longer than expected...'},
+    {duration:2500, start:99, end:99, caption:'One last tiny thing. Again.'}
   ];
   const total = phases.reduce((sum,phase)=>sum+phase.duration,0);
   const started = performance.now();
@@ -575,14 +613,15 @@ function renderSuccess() {
   frame('The Trophy of Patience','You made it through every last check.',`
     <div class="trophy-stage"><div class="trophy-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="trophy-ribbon"><span aria-hidden="true">✦</span> RARE ACHIEVEMENT UNLOCKED <span aria-hidden="true">✦</span></div>
-      <div class="trophy-halo"><svg class="trophy-laurel" viewBox="0 0 240 240" aria-hidden="true"><g fill="none" stroke="#d3a04a" stroke-width="2.5"><path d="M74 202C20 176 17 98 67 46"/><path d="M166 202c54-26 57-104 7-156"/></g><g fill="#d9aa56"><ellipse cx="46" cy="171" rx="7" ry="16" transform="rotate(-39 46 171)"/><ellipse cx="29" cy="140" rx="7" ry="15" transform="rotate(-18 29 140)"/><ellipse cx="27" cy="108" rx="7" ry="15" transform="rotate(8 27 108)"/><ellipse cx="38" cy="78" rx="7" ry="15" transform="rotate(30 38 78)"/><ellipse cx="56" cy="54" rx="7" ry="15" transform="rotate(50 56 54)"/><ellipse cx="194" cy="171" rx="7" ry="16" transform="rotate(39 194 171)"/><ellipse cx="211" cy="140" rx="7" ry="15" transform="rotate(18 211 140)"/><ellipse cx="213" cy="108" rx="7" ry="15" transform="rotate(-8 213 108)"/><ellipse cx="202" cy="78" rx="7" ry="15" transform="rotate(-30 202 78)"/><ellipse cx="184" cy="54" rx="7" ry="15" transform="rotate(-50 184 54)"/></g></svg><svg class="trophy-art" viewBox="0 0 240 240" role="img" aria-label="Golden trophy">
-        <defs><linearGradient id="goldCup" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1aa"/><stop offset=".38" stop-color="#f6bd49"/><stop offset=".72" stop-color="#d78920"/><stop offset="1" stop-color="#ffe383"/></linearGradient><linearGradient id="goldBase" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#aa6322"/><stop offset=".5" stop-color="#f8d276"/><stop offset="1" stop-color="#a7631e"/></linearGradient></defs>
-        <path d="M65 52H37v24c0 28 17 47 47 48M175 52h28v24c0 28-17 47-47 48" fill="none" stroke="#e5a738" stroke-width="13" stroke-linecap="round"/>
-        <path d="M66 43h108v49c0 43-22 72-54 72S66 135 66 92V43Z" fill="url(#goldCup)" stroke="#c18426" stroke-width="3"/>
-        <path d="M83 55h20c-12 24-12 54-2 84-15-11-18-37-18-57V55Z" fill="#fff6bd" opacity=".55"/>
-        <path d="m120 73 7 15 17 2-12 12 3 17-15-8-15 8 3-17-12-12 17-2 7-15Z" fill="#fff6cf" stroke="#e4a237" stroke-width="2"/>
-        <path d="M112 162h16v25h-16z" fill="url(#goldBase)"/><path d="M91 184h58v12H91zM78 196h84v17H78z" fill="url(#goldBase)" stroke="#a66a27" stroke-width="2"/>
-        <path d="M102 202h36v8h-36z" fill="#7b4a20" opacity=".7"/>
+      <div class="trophy-halo"><svg class="trophy-laurel" viewBox="0 0 240 240" aria-hidden="true"><g fill="none" stroke="#d3a04a" stroke-width="2.5"><path d="M74 202C20 176 17 98 67 46"/><path d="M166 202c54-26 57-104 7-156"/></g><g fill="#d9aa56"><ellipse cx="46" cy="171" rx="7" ry="16" transform="rotate(-39 46 171)"/><ellipse cx="29" cy="140" rx="7" ry="15" transform="rotate(-18 29 140)"/><ellipse cx="27" cy="108" rx="7" ry="15" transform="rotate(8 27 108)"/><ellipse cx="38" cy="78" rx="7" ry="15" transform="rotate(30 38 78)"/><ellipse cx="56" cy="54" rx="7" ry="15" transform="rotate(50 56 54)"/><ellipse cx="194" cy="171" rx="7" ry="16" transform="rotate(39 194 171)"/><ellipse cx="211" cy="140" rx="7" ry="15" transform="rotate(18 211 140)"/><ellipse cx="213" cy="108" rx="7" ry="15" transform="rotate(-8 213 108)"/><ellipse cx="202" cy="78" rx="7" ry="15" transform="rotate(-30 202 78)"/><ellipse cx="184" cy="54" rx="7" ry="15" transform="rotate(-50 184 54)"/></g></svg><svg class="trophy-art" viewBox="0 0 360 360" role="img" aria-label="Large engraved golden trophy">
+        <defs><linearGradient id="cupGold" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#8d4918"/><stop offset=".12" stop-color="#d69632"/><stop offset=".28" stop-color="#ffe6a0"/><stop offset=".47" stop-color="#f5bf55"/><stop offset=".72" stop-color="#b86b22"/><stop offset=".9" stop-color="#ffe29a"/><stop offset="1" stop-color="#95501b"/></linearGradient><linearGradient id="rimGold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff3c5"/><stop offset=".35" stop-color="#e8b95e"/><stop offset="1" stop-color="#98551e"/></linearGradient><linearGradient id="baseGold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe6a2"/><stop offset=".5" stop-color="#d18b31"/><stop offset="1" stop-color="#783e1b"/></linearGradient></defs>
+        <ellipse cx="180" cy="337" rx="137" ry="12" fill="#030d1d" opacity=".6"/>
+        <path d="M108 91H62c-26 0-36 18-36 42 0 56 33 94 96 98l15-36c-42-1-72-19-72-60v-7h44Z" fill="url(#cupGold)" stroke="#f9d67c" stroke-width="3"/><path d="M252 91h46c26 0 36 18 36 42 0 56-33 94-96 98l-15-36c42-1 72-19 72-60v-7h-44Z" fill="url(#cupGold)" stroke="#f9d67c" stroke-width="3"/>
+        <path d="M111 85h138l-9 100c-4 48-29 78-60 78s-56-30-60-78L111 85Z" fill="url(#cupGold)" stroke="#f8da8d" stroke-width="3"/><path d="M132 103h21l5 132c-19-12-29-33-32-62Z" fill="#fff0b6" opacity=".34"/><path d="M230 105h12l-9 78c-3 27-10 44-22 57 10-42 15-94 19-135Z" fill="#754017" opacity=".23"/>
+        <rect x="96" y="68" width="168" height="23" rx="8" fill="url(#rimGold)" stroke="#ffeab1" stroke-width="2"/><path d="M107 96h146" stroke="#834514" stroke-width="3" opacity=".65"/>
+        <circle cx="180" cy="161" r="40" fill="#874813" opacity=".5"/><circle cx="180" cy="158" r="39" fill="url(#rimGold)" stroke="#fff0ba" stroke-width="3"/><circle cx="180" cy="158" r="31" fill="#9d591d" stroke="#e8b75b" stroke-width="2"/><path d="m180 133 7 15 17 2-12 12 3 17-15-8-15 8 3-17-12-12 17-2 7-15Z" fill="#fff4c7" stroke="#f4c66d" stroke-width="2"/>
+        <path d="M147 217c9 22 19 34 33 40 14-6 24-18 33-40" fill="none" stroke="#ffdc81" stroke-width="3" opacity=".72"/><path d="M164 258h32v29h-32z" fill="url(#cupGold)" stroke="#eec476" stroke-width="2"/>
+        <path d="M139 286h82l9 12H130l9-12Z" fill="url(#rimGold)" stroke="#ffe2a0" stroke-width="2"/><rect x="112" y="298" width="136" height="17" rx="4" fill="url(#baseGold)" stroke="#efc578" stroke-width="2"/><rect x="97" y="315" width="166" height="21" rx="5" fill="url(#baseGold)" stroke="#f4d58e" stroke-width="2"/><rect x="136" y="318" width="88" height="14" rx="2" fill="#55331f" stroke="#d6a652" stroke-width="1.5"/><text x="180" y="328" text-anchor="middle" fill="#f9d781" font-family="Georgia,serif" font-size="8" letter-spacing="2">PATIENCE</text>
       </svg></div><p class="trophy-overline">OFFICIALLY AWARDED</p><h3>For extraordinary persistence</h3>
       <p class="trophy-description">You survived the password rules, the confusing squares, the suspicious terms, and the final final confirmation.</p>
       <div class="trophy-stamp">PATIENCE LEVEL: LEGENDARY <span aria-hidden="true">✦</span></div>
@@ -594,17 +633,57 @@ function renderSuccess() {
   panel.querySelector('#openBreakRoom').addEventListener('click',()=>moveTo('prize'));
   panel.querySelector('#startAgain').addEventListener('click',()=>moveTo('signup'));
 }
+let bubbleAudioContext;
+function playBubblePop(index) {
+  const AudioContextClass=window.AudioContext || window.webkitAudioContext;
+  if(!AudioContextClass) return;
+  try {
+    bubbleAudioContext ||= new AudioContextClass();
+    const context=bubbleAudioContext;
+    if(context.state==='suspended') context.resume().catch(()=>{});
+    const now=context.currentTime;
+    const duration=.085;
+    const buffer=context.createBuffer(1,Math.ceil(context.sampleRate*duration),context.sampleRate);
+    const samples=buffer.getChannelData(0);
+    for(let sample=0;sample<samples.length;sample++) samples[sample]=(Math.random()*2-1)*Math.pow(1-sample/samples.length,5);
+    const noise=context.createBufferSource();
+    const filter=context.createBiquadFilter();
+    const noiseGain=context.createGain();
+    noise.buffer=buffer;
+    filter.type='lowpass';
+    filter.frequency.value=950+(index%5)*110;
+    noiseGain.gain.value=.24;
+    noise.connect(filter).connect(noiseGain).connect(context.destination);
+    noise.start(now);
+    noise.onended=()=>{noise.disconnect();filter.disconnect();noiseGain.disconnect();};
+    const tone=context.createOscillator();
+    const toneGain=context.createGain();
+    tone.type='sine';
+    tone.frequency.setValueAtTime(190+(index%4)*12,now);
+    tone.frequency.exponentialRampToValueAtTime(85,now+duration);
+    toneGain.gain.setValueAtTime(.11,now);
+    toneGain.gain.exponentialRampToValueAtTime(.001,now+duration);
+    tone.connect(toneGain).connect(context.destination);
+    tone.start(now);
+    tone.stop(now+duration);
+    tone.onended=()=>{tone.disconnect();toneGain.disconnect();};
+  } catch(error) {
+    // Sound is a bonus; the bubble still pops if audio is unavailable.
+  }
+}
 function renderPrize() {
   if(!awardId) return moveTo('signup');
   frame('The break room','No forms. No confirmation. Just something satisfying.',`
-    <div class="break-room"><div class="break-room-head"><span>UNLIMITED BUBBLE WRAP</span><strong id="bubbleCount" aria-live="polite">0 / 24 popped</strong></div><div class="bubble-sheet" role="group" aria-label="Bubble wrap">${Array.from({length:24},(_,index)=>`<button class="bubble" type="button" aria-label="Bubble ${index+1}" aria-pressed="false"></button>`).join('')}</div><p id="bubbleMessage">Go on. Pop every one.</p><button type="button" class="link-button" id="resetBubbles">Fresh sheet, please</button></div>
+    <div class="break-room"><div class="break-room-head"><span>UNLIMITED BUBBLE WRAP</span><strong id="bubbleCount" aria-live="polite">0 / 24 popped</strong></div><div class="bubble-sheet" role="group" aria-label="Bubble wrap">${Array.from({length:24},(_,index)=>`<button class="bubble" type="button" aria-label="Bubble ${index+1}" aria-pressed="false"></button>`).join('')}</div><p id="bubbleMessage">Go on. Pop every one.</p><div class="break-room-tools"><button type="button" class="link-button" id="resetBubbles">Fresh sheet, please</button><button type="button" class="sound-toggle" id="toggleSound" aria-pressed="true">Sound on</button></div></div>
     <div class="break-actions"><button type="button" class="button button-primary" id="downloadAgain">Download my Patience Pass ↓</button><button type="button" class="button button-secondary" id="backToTrophy">Back to trophy</button></div>`);
   let popped=0;
+  let soundOn=true;
   const bubbles=[...panel.querySelectorAll('.bubble')];
-  bubbles.forEach(bubble=>bubble.addEventListener('click',()=>{
+  bubbles.forEach((bubble,index)=>bubble.addEventListener('click',()=>{
     if(bubble.classList.contains('popped')) return;
     bubble.classList.add('popped');
     bubble.setAttribute('aria-pressed','true');
+    if(soundOn) playBubblePop(index);
     popped++;
     panel.querySelector('#bubbleCount').textContent=`${popped} / 24 popped`;
     if(popped===24) panel.querySelector('#bubbleMessage').textContent='Beautiful. The internet can be nice sometimes.';
@@ -614,6 +693,11 @@ function renderPrize() {
     popped=0;
     panel.querySelector('#bubbleCount').textContent='0 / 24 popped';
     panel.querySelector('#bubbleMessage').textContent='A fresh sheet. No waiting required.';
+  });
+  panel.querySelector('#toggleSound').addEventListener('click',event=>{
+    soundOn=!soundOn;
+    event.currentTarget.setAttribute('aria-pressed',String(soundOn));
+    event.currentTarget.textContent=soundOn?'Sound on':'Sound off';
   });
   panel.querySelector('#downloadAgain').addEventListener('click',downloadPatiencePass);
   panel.querySelector('#backToTrophy').addEventListener('click',()=>moveTo('success'));
