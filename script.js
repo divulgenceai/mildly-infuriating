@@ -104,9 +104,6 @@ function renderSignup() {
     visibleRuleCount = count;
     panel.querySelector('#rules').hidden = false;
     updateRules();
-    passwordAgain.value = '';
-    notice('There is one more thing. Please confirm your password again.','info');
-    password.focus();
   };
   password.addEventListener('input', () => {
     if (passwordAgain.value) { passwordAgain.value=''; notice('Please confirm your updated password.','info'); }
@@ -120,18 +117,25 @@ function renderSignup() {
     if (!password.value) return notice('Enter a password to continue.');
     if (password.value !== passwordAgain.value) return notice('The passwords do not match. Please type it again.');
 
-    if (visibleRuleCount === 0) {
-      revealThrough(initialRuleCount);
-      return;
+    const previousRuleCount = visibleRuleCount;
+    if (visibleRuleCount === 0) revealThrough(initialRuleCount);
+
+    // Keep revealing rules the current password already satisfies in this one attempt.
+    // Stop at the first new requirement that actually needs a change.
+    let unmet = passwordRules.slice(0,visibleRuleCount).find(rule => !rule.test(password.value));
+    while (!unmet && visibleRuleCount < passwordRules.length) {
+      revealThrough(visibleRuleCount + 1);
+      const newestRule = passwordRules[visibleRuleCount - 1];
+      if (!newestRule.test(password.value)) unmet = newestRule;
     }
-    const unmet = passwordRules.slice(0,visibleRuleCount).find(rule => !rule.test(password.value));
     if (unmet) {
-      notice(unmet.text);
+      if (visibleRuleCount > previousRuleCount) {
+        passwordAgain.value = '';
+        notice(`${unmet.text} Please confirm your password again.`, 'info');
+      } else {
+        notice(unmet.text);
+      }
       password.focus();
-      return;
-    }
-    if (visibleRuleCount < passwordRules.length) {
-      revealThrough(visibleRuleCount+1);
       return;
     }
     form.reset();
