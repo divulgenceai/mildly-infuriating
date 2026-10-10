@@ -162,10 +162,31 @@ const challenges = [
   {name:'traffic lights', detail:'Select all squares with traffic lights.', answer:[0,4,7]},
   {name:'bicycles', detail:'Please complete this additional check.', answer:[1,3,6]},
   {name:'anything that is not a bus', detail:'Yes, the traffic lights count again.', answer:[0,1,3,4,6,7]},
+  {name:'traffic lights that are not red', detail:'Amber and green count. The red one does not.', answer:[4,7]},
+  {name:'things with wheels, except buses', detail:'Please ignore the wheels on the buses.', answer:[1,3,6]},
   {name:'every single square', detail:'We just want to be absolutely certain.', answer:[0,1,2,3,4,5,6,7,8]}
 ];
+const shapeTiles = [
+  {shape:'triangle',color:'blue',turn:0}, {shape:'circle',color:'blue',turn:0}, {shape:'triangle',color:'coral',turn:90},
+  {shape:'diamond',color:'blue',turn:0}, {shape:'triangle',color:'blue',turn:180}, {shape:'square',color:'coral',turn:0},
+  {shape:'pentagon',color:'blue',turn:0}, {shape:'star',color:'coral',turn:0}, {shape:'triangle',color:'blue',turn:270}
+];
+const shapeQuestions = [
+  {name:'every triangle',detail:'Turned triangles are still triangles.',answer:[0,2,4,8]},
+  {name:'only the blue triangles',detail:'A blue diamond is not a triangle.',answer:[0,4,8]}
+];
+function shapeArt(item) {
+  const forms = {
+    triangle:'<polygon points="50,14 85,79 15,79"/>', circle:'<circle cx="50" cy="50" r="31"/>',
+    diamond:'<polygon points="50,12 88,50 50,88 12,50"/>', square:'<rect x="21" y="21" width="58" height="58" rx="3"/>',
+    pentagon:'<polygon points="50,11 87,38 73,83 27,83 13,38"/>', star:'<polygon points="50,9 59,37 88,37 65,55 74,84 50,67 26,84 35,55 12,37 41,37"/>'
+  };
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" style="transform:rotate(${item.turn}deg)"><g fill="${item.color==='blue'?'#3d7bd5':'#ee8769'}">${forms[item.shape]}</g></svg>`;
+}
 function renderCaptcha() {
   let challengeIndex = 0;
+  let shapeRound = 0;
+  let equationDone = false;
   let chosen = new Set();
   let refreshOffset = 0;
   frame('Confirm it’s you','We just need to run a quick security check.',`
@@ -182,7 +203,11 @@ function renderCaptcha() {
   dialog.addEventListener('close', () => checkbox.setAttribute('aria-expanded','false'));
   checkbox.addEventListener('click', () => {
     checkbox.setAttribute('aria-expanded','true');
-    paint();
+    chosen.clear();
+    if(challengeIndex<challenges.length) paint();
+    else if(shapeRound<shapeQuestions.length) paintShapes();
+    else if(!equationDone) paintEquation();
+    else paintFinal();
     dialog.showModal();
   });
   function paint(message = '') {
@@ -210,7 +235,45 @@ function renderCaptcha() {
       refreshOffset=(refreshOffset+2)%9;
       chosen.clear();
       if(challengeIndex<challenges.length) paint('One more quick check.');
-      else paintFinal();
+      else paintShapes('Now for a different kind of image.');
+    });
+  }
+  function paintShapes(message = '') {
+    const current = shapeQuestions[shapeRound];
+    dialog.innerHTML = `<div class="captcha-dialog-header"><span>Select</span><strong>${current.name}</strong><small>${current.detail}</small></div>
+      <div class="captcha-dialog-body"><div class="captcha-grid shape-grid" role="group" aria-label="Shape challenge">${Array.from({length:9},(_,index)=>{
+        const shapeIndex=(index+refreshOffset)%9;
+        return `<button type="button" class="shape-tile" data-tile="${index}" data-shape="${shapeIndex}" aria-label="Shape ${index+1}" aria-pressed="false">${shapeArt(shapeTiles[shapeIndex])}</button>`;
+      }).join('')}</div><p class="captcha-message" role="status" aria-live="polite">${message}</p></div>
+      <div class="captcha-dialog-footer"><div class="captcha-dialog-tools"><button type="button" id="refreshChallenge" aria-label="Rotate shapes" title="Rotate shapes">↻</button><button type="button" id="challengeHelp" aria-label="Challenge help" title="Help">?</button></div><button type="button" class="captcha-verify" id="verify">VERIFY</button></div>`;
+    dialog.querySelectorAll('.shape-tile').forEach(tile=>tile.addEventListener('click',()=>{
+      const index=Number(tile.dataset.tile);
+      chosen.has(index) ? chosen.delete(index) : chosen.add(index);
+      tile.classList.toggle('selected',chosen.has(index));
+      tile.setAttribute('aria-pressed',String(chosen.has(index)));
+    }));
+    dialog.querySelector('#refreshChallenge').addEventListener('click',()=>{chosen.clear();refreshOffset=(refreshOffset+1)%9;paintShapes('The shapes have been rearranged.');});
+    dialog.querySelector('#challengeHelp').addEventListener('click',()=>{dialog.querySelector('.captcha-message').textContent='Look at the shape and colour of each square, then press VERIFY.';});
+    dialog.querySelector('#verify').addEventListener('click',()=>{
+      const answers=[...dialog.querySelectorAll('.shape-tile')].filter(tile=>current.answer.includes(Number(tile.dataset.shape))).map(tile=>Number(tile.dataset.tile));
+      const right=answers.length===chosen.size && answers.every(index=>chosen.has(index));
+      chosen.clear();
+      if(!right){refreshOffset=(refreshOffset+1)%9;paintShapes('Not quite. Try the rearranged shapes.');return;}
+      shapeRound++;
+      refreshOffset=(refreshOffset+2)%9;
+      if(shapeRound<shapeQuestions.length) paintShapes('Please check the shapes again.');
+      else paintEquation();
+    });
+  }
+  function paintEquation() {
+    dialog.innerHTML=`<div class="captcha-dialog-header"><span>One quick calculation</span><strong>Solve this equation</strong><small>It is a basic one. Probably.</small></div>
+      <form class="captcha-math" id="captchaMath" novalidate><div class="captcha-math-problem">8 <span>+</span> 5 <span>=</span> ?</div><label for="mathAnswer">Your answer</label><input id="mathAnswer" type="number" inputmode="numeric" autocomplete="off" placeholder="Enter a number" required><p class="captcha-message" role="status" aria-live="polite"></p><button type="submit" class="captcha-verify">VERIFY ANSWER</button></form>`;
+    dialog.querySelector('#captchaMath').addEventListener('submit',event=>{
+      event.preventDefault();
+      const answer=dialog.querySelector('#mathAnswer');
+      if(answer.value.trim()!=='13') {answer.value='';dialog.querySelector('.captcha-message').textContent='That answer did not add up. Try again.';answer.focus();return;}
+      equationDone=true;
+      paintFinal();
     });
   }
   function paintFinal() {
@@ -266,9 +329,9 @@ const termsChapters = [
   {title:'The introductory introduction', clauses:[
     'This is a parody demo. No account will be created, and the details you type are used only inside this browser tab for the final memory check. They are not submitted to a server or saved between visits. Reading beyond this sentence does not create a legal contract, although it may create a lasting impression.',
     'The phrase “quick setup” describes an aspiration rather than a measurable unit of time. A quick setup may include a few questions, several questions about the previous questions, and a pause in which the interface appears to consider whether the previous answers were sufficiently enthusiastic.',
-    'By continuing to read, you acknowledge that a button labelled Continue may ask you to continue doing the thing you were already doing. A button labelled Final may be followed by another button with an even more final sounding label. These labels are intended for dramatic effect.',
+    'By continuing to read, you acknowledge that a button labelled Continue may ask you to continue doing the thing you were already doing. Small boxes in this document serve different purposes: some record what you read, while others request entirely new inconveniences. The site assumes you can tell the difference.',
     'If a page asks you to confirm an email address twice, the second entry is presumed to contain the same letters in roughly the same order. The site may nevertheless request a third confirmation later, after you have had enough time to forget what you typed in the first two.'
-  ], mark:'I noticed the small acknowledgement in the introduction.'},
+  ], mark:'I noticed the small acknowledgement in the introduction.', trap:'Please add another verification round for me.'},
   {title:'On verification and reasonable doubt', clauses:[
     'Images used for verification may feature familiar street objects. A bicycle remains a bicycle when viewed from an inconvenient angle, a traffic light remains a traffic light while displaying amber, and a bus continues to qualify as a bus even when it looks as though it would rather be elsewhere.',
     'A completed challenge may lead to another challenge. This does not imply that the first answer was wrong. It merely means the system has found a new way to be uncertain. The next challenge may reuse the same images because acquiring new ones would have taken additional time.',
@@ -280,7 +343,7 @@ const termsChapters = [
     'Necessary cookies in this demo are a subject of conversation rather than a real tracking system. The choices presented are part of the joke. Any apparent urgency in the wording of the preference screen is therefore entirely cosmetic, much like the certainty of a progress bar.',
     'If you leave this page before finishing, the process may begin again when you return. This behaviour should not be interpreted as a motivational technique, although it has been observed to produce a surprising level of determination in some visitors.',
     'Occasional phrases such as “one more thing” and “almost there” are not guarantees about distance to completion. They are expressions of optimism. The site may be optimistic on your behalf even when you would prefer it to be quiet.'
-  ], mark:'I found this tiny line among the preferences.'},
+  ], mark:'I found this tiny line among the preferences.', trap:'Turn every optional notification back on for me.'},
   {title:'Progress, waiting, and confirmation', clauses:[
     'Progress indicators can accelerate, decelerate, pause, and resume without providing a reliable measure of work. A percentage reflects what the interface currently wishes to communicate. It does not necessarily correspond to the amount of patience still required.',
     'A request for confirmation may itself be followed by a request to confirm that confirmation. This sequence is considered a normal part of the demo. You may wonder whether the system heard you the first time. It did. It simply enjoys hearing you say it again.',
@@ -292,16 +355,17 @@ const termsChapters = [
     'If you locate every small acknowledgement in this document, scroll through the remaining text, remember your made-up details, and finish the process, you may receive a digital trophy. The trophy has no monetary value, though the patience it represents may feel expensive.',
     'The trophy may be admired, celebrated, or shown to someone who has not yet attempted this process. It is not transferable to another tab. Refreshing the page may cause the trophy to disappear, but the memory of reaching it should remain available without an internet connection.',
     'This is the end of the demo terms. There is no hidden clause after this paragraph. Please take a moment to appreciate that this sentence is, for once, exactly as final as it sounds.'
-  ]}
+  ], mark:'I really did reach the end of the document.'}
 ];
 function renderTerms() {
   const chapters = termsChapters.map((chapter, chapterIndex) => `<section class="terms-chapter">
     <h4>${chapter.title}</h4>${chapter.clauses.map((clause,index)=>`<p><span class="clause-number">${chapterIndex*4+index+1}.</span> ${clause}</p>`).join('')}
-    ${chapter.mark ? `<label class="terms-tiny-check"><input type="checkbox" class="terms-mark" aria-label="${chapter.mark}"><span>${chapter.mark}</span></label>` : ''}
+    ${chapter.mark ? `<label class="terms-tiny-check"><input type="checkbox" class="terms-mark" data-expected="true" aria-label="${chapter.mark}"><span>${chapter.mark}</span></label>` : ''}
+    ${chapter.trap ? `<label class="terms-tiny-check"><input type="checkbox" class="terms-mark" data-expected="false" aria-label="${chapter.trap}"><span>${chapter.trap}</span></label>` : ''}
   </section>`).join('');
   frame('One final review','Read carefully. Some of the small print wants an answer.',`
     <div class="terms-topline"><span>TERMS OF USE</span><span>Scroll to read</span></div>
-    <div class="terms-box" id="terms" tabindex="0" aria-label="Demo terms. Scroll through each section and tick the small acknowledgements.">
+    <div class="terms-box" id="terms" tabindex="0" aria-label="Demo terms. Scroll through the document and review the small choices.">
       <h3>Terms of use</h3><p class="terms-effective">Effective whenever you opened this page · Demo edition</p>${chapters}
     </div>
     <label class="check-row locked" id="agreementRow"><input id="agreement" type="checkbox" disabled> I have read and agree to the demo terms.</label>
@@ -309,31 +373,21 @@ function renderTerms() {
   const terms = panel.querySelector('#terms');
   const marks = [...panel.querySelectorAll('.terms-mark')];
   const agreement = panel.querySelector('#agreement');
-  marks.slice(1).forEach(mark=>mark.disabled=true);
   const updateScroll = () => {
-    const nextMark = marks.find(mark=>!mark.checked);
-    if (nextMark) {
-      const markPosition = nextMark.getBoundingClientRect().top - terms.getBoundingClientRect().top + terms.scrollTop;
-      const scrollLimit = Math.max(0, markPosition - terms.clientHeight + 100);
-      if (terms.scrollTop > scrollLimit + 1) terms.scrollTop = scrollLimit;
-      return;
-    }
     if (terms.scrollTop + terms.clientHeight >= terms.scrollHeight - 8) {
       agreement.disabled = false;
       panel.querySelector('#agreementRow').classList.remove('locked');
     }
   };
-  marks.forEach((mark,index)=>mark.addEventListener('change',()=>{
+  marks.forEach(mark=>mark.addEventListener('change',()=>{
     mark.closest('.terms-tiny-check').classList.toggle('acknowledged',mark.checked);
-    if (marks[index+1]) marks[index+1].disabled = !mark.checked;
-    updateScroll();
   }));
   terms.addEventListener('scroll',updateScroll);
   updateScroll();
   panel.querySelector('#termsContinue').addEventListener('click',()=>{
-    if(marks.some(mark=>!mark.checked)) return notice('A few tiny acknowledgements are still waiting inside the terms.');
     if(agreement.disabled) return notice('Please scroll through the final section.');
     if(!agreement.checked) return notice('Please tick the agreement box.');
+    if(marks.some(mark=>mark.checked!==(mark.dataset.expected==='true'))) return notice('One or more tiny choices contradict what you agreed to. Review the terms again.');
     moveTo('waiting');
   });
 }
@@ -424,8 +478,9 @@ function renderQuiz() {
 }
 function renderSuccess() {
   frame('The Trophy of Patience','You made it through every last check.',`
-    <div class="trophy-stage"><div class="trophy-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="trophy-halo"><svg class="trophy-art" viewBox="0 0 240 240" role="img" aria-label="Golden trophy">
+    <div class="trophy-stage"><div class="trophy-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="trophy-ribbon"><span aria-hidden="true">✦</span> RARE ACHIEVEMENT UNLOCKED <span aria-hidden="true">✦</span></div>
+      <div class="trophy-halo"><svg class="trophy-laurel" viewBox="0 0 240 240" aria-hidden="true"><g fill="none" stroke="#d3a04a" stroke-width="2.5"><path d="M74 202C20 176 17 98 67 46"/><path d="M166 202c54-26 57-104 7-156"/></g><g fill="#d9aa56"><ellipse cx="46" cy="171" rx="7" ry="16" transform="rotate(-39 46 171)"/><ellipse cx="29" cy="140" rx="7" ry="15" transform="rotate(-18 29 140)"/><ellipse cx="27" cy="108" rx="7" ry="15" transform="rotate(8 27 108)"/><ellipse cx="38" cy="78" rx="7" ry="15" transform="rotate(30 38 78)"/><ellipse cx="56" cy="54" rx="7" ry="15" transform="rotate(50 56 54)"/><ellipse cx="194" cy="171" rx="7" ry="16" transform="rotate(39 194 171)"/><ellipse cx="211" cy="140" rx="7" ry="15" transform="rotate(18 211 140)"/><ellipse cx="213" cy="108" rx="7" ry="15" transform="rotate(-8 213 108)"/><ellipse cx="202" cy="78" rx="7" ry="15" transform="rotate(-30 202 78)"/><ellipse cx="184" cy="54" rx="7" ry="15" transform="rotate(-50 184 54)"/></g></svg><svg class="trophy-art" viewBox="0 0 240 240" role="img" aria-label="Golden trophy">
         <defs><linearGradient id="goldCup" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1aa"/><stop offset=".38" stop-color="#f6bd49"/><stop offset=".72" stop-color="#d78920"/><stop offset="1" stop-color="#ffe383"/></linearGradient><linearGradient id="goldBase" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#aa6322"/><stop offset=".5" stop-color="#f8d276"/><stop offset="1" stop-color="#a7631e"/></linearGradient></defs>
         <path d="M65 52H37v24c0 28 17 47 47 48M175 52h28v24c0 28-17 47-47 48" fill="none" stroke="#e5a738" stroke-width="13" stroke-linecap="round"/>
         <path d="M66 43h108v49c0 43-22 72-54 72S66 135 66 92V43Z" fill="url(#goldCup)" stroke="#c18426" stroke-width="3"/>
@@ -434,8 +489,9 @@ function renderSuccess() {
         <path d="M112 162h16v25h-16z" fill="url(#goldBase)"/><path d="M91 184h58v12H91zM78 196h84v17H78z" fill="url(#goldBase)" stroke="#a66a27" stroke-width="2"/>
         <path d="M102 202h36v8h-36z" fill="#7b4a20" opacity=".7"/>
       </svg></div><p class="trophy-overline">OFFICIALLY AWARDED</p><h3>For extraordinary persistence</h3>
-      <p class="trophy-description">You survived the password rules, the tiny pictures, the tiny terms, and the final final confirmation.</p>
+      <p class="trophy-description">You survived the password rules, the confusing squares, the suspicious terms, and the final final confirmation.</p>
       <div class="trophy-stamp">PATIENCE LEVEL: LEGENDARY <span aria-hidden="true">✦</span></div>
+      <div class="trophy-plaque"><span>THE ${currentYear} PATIENCE AWARD</span><strong>No shortcuts. No mercy. You made it.</strong></div>
     </div><p class="summary">No account was created. Your made-up details have been cleared from this tab. The trophy, however, is yours to admire.</p>
     <button type="button" class="button button-primary full" id="startAgain">Try the whole thing again</button>`);
   panel.querySelector('#startAgain').addEventListener('click',()=>moveTo('signup'));
