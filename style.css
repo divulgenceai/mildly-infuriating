@@ -30,4 +30,53 @@
 .captcha-dialog-tools{display:flex;gap:4px}.captcha-dialog-tools button{width:38px;height:35px;border:0;background:none;color:#777;font:27px/1 Arial,sans-serif}.captcha-dialog-tools button:hover{color:#333}.captcha-verify{min-height:38px;background:#4a82dc;border:0;border-radius:2px;color:#fff;padding:0 21px;font:bold 13px Arial,sans-serif;letter-spacing:.02em}.captcha-verify:hover{background:#346fd1}
 .captcha-final{min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}.captcha-final-icon{width:53px;height:53px;border-radius:50%;background:#e5f5ee;color:#27945b;display:grid;place-items:center;font-size:32px}.captcha-final p{max-width:260px;color:#414141;font-size:15px;line-height:1.45;margin:17px 0 21px}
 @media(max-width:430px){.captcha-dialog{padding:5px}.captcha-dialog-header{min-height:98px;padding:12px 14px}.captcha-dialog-header strong{font-size:23px}.captcha-dialog .captcha-grid{gap:2px}.captcha-message{margin-top:5px}.captcha-dialog-footer{padding-top:5px}}
+
+/* Terms are a real scroll journey, with small acknowledgements in the text. */
+.terms-topline{display:flex;justify-content:space-between;gap:10px;color:#8491a5;font-size:10px;font-weight:700;letter-spacing:.13em;margin:0 0 9px}
+.terms-topline span:last-child{letter-spacing:0;text-transform:none;font-weight:500}
+.terms-box{position:relative;height:350px;border:1px solid #d3dceb;border-radius:10px;overflow:auto;padding:25px 26px;color:#4d5b74;font-size:13px;line-height:1.75;background:linear-gradient(#fff,#fcfdff);box-shadow:inset 0 -12px 20px #ebf1f75e;overscroll-behavior:contain;scrollbar-color:#aabbd5 #eef2f8;scrollbar-width:thin}
+.terms-box h3{font:400 27px/1.15 var(--serif);letter-spacing:-.015em;margin:0 0 4px;color:var(--navy)}
+.terms-effective{font-size:11px;color:#94a0b2;margin:0 0 25px!important}
+.terms-chapter{padding:17px 0 22px;border-top:1px solid #e5ebf3}
+.terms-chapter h4{font-size:15px;line-height:1.3;color:#1b315d;margin:0 0 16px}
+.terms-chapter p{margin:0 0 17px}.clause-number{font-weight:700;color:#5277b6}
+.terms-tiny-check{display:inline-flex;align-items:center;gap:7px;color:#6e7d95;font-size:11px;line-height:1.4;padding:3px 7px 3px 3px;border-radius:4px;cursor:pointer;transition:background .2s,color .2s}
+.terms-tiny-check:hover,.terms-tiny-check:focus-within{background:#edf4ff;color:#285baa}
+.terms-tiny-check input{appearance:none;width:15px;height:15px;border:1px solid #9baeca;background:#fff;border-radius:3px;margin:0;flex:none;display:grid;place-items:center;cursor:pointer}
+.terms-tiny-check input:checked{background:#2e9b79;border-color:#2e9b79}.terms-tiny-check input:checked:after{content:'✓';color:#fff;font-size:11px;line-height:1}
+.terms-tiny-check input:disabled{opacity:.45;cursor:default}.terms-tiny-check.acknowledged{color:#268068}
+.check-row{margin:20px 0 14px}.check-row:not(.locked){color:#1c355d}
+
+/* Setup progress moves slowly, rushes, then crawls to the confirmations. */
+.loading-scene{background:radial-gradient(circle at 90% 0%,#dfeeff 0%,transparent 44%),linear-gradient(150deg,#f8fbff,#eef5ff);border:1px solid #dce8f6;border-radius:16px;padding:27px 27px 23px;margin:10px 0 5px;position:relative;overflow:hidden}
+.loading-kicker{font-size:11px;font-weight:700;letter-spacing:.16em;color:#6884ae}
+.loading-number{font:400 clamp(78px,9vw,105px)/1 var(--serif);letter-spacing:-.07em;color:#235fb7;margin:20px 0 25px}
+.loading-track{height:14px;border-radius:10px;background:#dbe6f6;overflow:hidden;box-shadow:inset 0 1px 3px #5685bb28}
+.loading-fill{height:100%;width:0;border-radius:10px;background:linear-gradient(90deg,#7fb0f6,#3a77dc,#93bfff);background-size:220% 100%;transition:width .14s linear;animation:progressShine 2.2s linear infinite}
+.loading-caption{color:#4f6687;font-size:14px;line-height:1.45;margin:17px 0 4px;min-height:21px}
+.loading-dots{display:flex;gap:5px;position:absolute;right:27px;bottom:28px}.loading-dots i{width:5px;height:5px;border-radius:50%;background:#8db0e8;animation:loadingPulse 1.2s ease-in-out infinite}.loading-dots i:nth-child(2){animation-delay:.2s}.loading-dots i:nth-child(3){animation-delay:.4s}
+@keyframes progressShine{to{background-position:-220% 0}}@keyframes loadingPulse{50%{opacity:.25;transform:translateY(-3px)}}
+.certainty-dialog{width:min(400px,calc(100vw - 32px));border:1px solid #e0e7f0;border-radius:17px;padding:32px;background:#fff;color:var(--navy);box-shadow:0 25px 80px #122d5b42;text-align:center}
+.certainty-dialog::backdrop{background:#11285175;backdrop-filter:blur(3px)}
+.certainty-eyebrow{display:block;color:#6d8ab9;font-size:10px;font-weight:700;letter-spacing:.15em;margin-bottom:17px}
+.certainty-icon{width:56px;height:56px;border:1px solid #bcd3f4;border-radius:50%;background:#eaf3ff;color:#3976d4;display:grid;place-items:center;font:400 37px var(--serif);margin:0 auto 16px}
+.certainty-dialog h3{font:400 31px/1.15 var(--serif);margin:0 0 10px}.certainty-dialog p{font-size:14px;line-height:1.55;color:#637491;margin:0 0 24px}
+.quiz-badge{display:inline-flex;gap:8px;align-items:center;background:#f6f0e2;color:#947037;border:1px solid #e9d7ad;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:.09em;padding:7px 11px;margin:-8px 0 27px}
+.quiz-badge span{font-size:15px;line-height:1}.quiz-hint{font-size:12px;color:#8390a7;line-height:1.5;margin:2px 0 10px}
+
+/* The only actual reward is presented with considerably more ceremony. */
+.form-card.award-mode{border-color:#ebdbb9;box-shadow:0 24px 70px #956b2c1c}
+.award-mode>h2,.award-mode>.subtitle{text-align:center}.award-mode>h2{font-size:clamp(38px,3.3vw,53px)}
+.trophy-stage{position:relative;isolation:isolate;overflow:hidden;text-align:center;border:1px solid #f1dcae;border-radius:18px;background:radial-gradient(circle at 50% 31%,#fffdf6 0%,#fff6df 42%,#f9eac8 100%);padding:25px 24px 28px;box-shadow:inset 0 1px 0 #fff,0 14px 30px #99692116}
+.trophy-halo{width:205px;height:205px;display:grid;place-items:center;margin:0 auto 7px;border-radius:50%;background:radial-gradient(circle,#fff8d8 0%,#f6d98a78 54%,transparent 72%);filter:drop-shadow(0 16px 15px #b7832b40)}
+.trophy-art{width:205px;height:205px;overflow:visible;animation:trophyArrive .75s cubic-bezier(.2,1.3,.4,1) both}
+.trophy-overline{font-size:10px;color:#a07431;letter-spacing:.19em;font-weight:700;margin:3px 0 9px}
+.trophy-stage h3{font:400 29px/1.16 var(--serif);color:#4a351a;letter-spacing:-.015em;margin:0 0 10px}
+.trophy-description{max-width:345px;margin:0 auto 19px;color:#765e3d;font-size:13px;line-height:1.55}
+.trophy-stamp{display:inline-flex;gap:9px;align-items:center;border:1px solid #cfa960;border-radius:30px;padding:8px 14px;color:#8b5d19;font-size:10px;font-weight:700;letter-spacing:.08em;background:#fff8e6}.trophy-stamp span{font-size:15px}
+.trophy-sparkles i{position:absolute;width:7px;height:7px;background:#e7ad42;transform:rotate(45deg);opacity:.75;animation:sparkle 2.8s ease-in-out infinite}.trophy-sparkles i:nth-child(1){left:12%;top:20%}.trophy-sparkles i:nth-child(2){left:23%;top:43%;width:4px;height:4px;animation-delay:.5s}.trophy-sparkles i:nth-child(3){right:15%;top:18%;animation-delay:.9s}.trophy-sparkles i:nth-child(4){right:21%;top:43%;width:5px;height:5px;animation-delay:1.3s}.trophy-sparkles i:nth-child(5){left:8%;top:67%;width:4px;height:4px;animation-delay:1.6s}.trophy-sparkles i:nth-child(6){right:9%;top:69%;animation-delay:2s}.trophy-sparkles i:nth-child(7){left:35%;top:12%;width:4px;height:4px;animation-delay:1s}.trophy-sparkles i:nth-child(8){right:35%;top:11%;width:5px;height:5px;animation-delay:1.8s}
+@keyframes trophyArrive{from{opacity:0;transform:translateY(20px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes sparkle{50%{opacity:.25;transform:rotate(45deg) scale(.5)}}
+.award-mode .summary{text-align:center;border:0;margin:13px 0 20px;padding:0;color:#68748a}
+@media(max-width:430px){.terms-box{height:315px;padding:20px}.loading-scene{padding:23px 20px}.loading-dots{right:20px;bottom:27px}.certainty-dialog{padding:26px}.trophy-stage{padding:16px 15px 25px}.trophy-stage h3{font-size:25px}.trophy-halo,.trophy-art{width:170px;height:170px}}
+@media(prefers-reduced-motion:reduce){.loading-fill,.loading-dots i,.trophy-art,.trophy-sparkles i{animation:none}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}

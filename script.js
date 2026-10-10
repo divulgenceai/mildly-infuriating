@@ -4,6 +4,12 @@ let scene = 'signup';
 let visibleRuleCount = 0;
 let toastTimer;
 let waitTimer;
+let enteredDetails = null;
+const pendingTimers = new Set();
+function schedule(callback, delay) {
+  const timer = setTimeout(() => { pendingTimers.delete(timer); callback(); }, delay);
+  pendingTimers.add(timer);
+}
 
 function notify(message) {
   toast.textContent = message;
@@ -32,11 +38,17 @@ function blockCopy(input) {
 function moveTo(next) {
   scene = next;
   clearInterval(waitTimer);
+  pendingTimers.forEach(clearTimeout);
+  pendingTimers.clear();
   document.querySelector('#captchaDialog')?.remove();
+  document.querySelector('#certaintyDialog')?.remove();
+  if (next === 'signup' || next === 'login') enteredDetails = null;
   render();
   if (window.innerWidth < 761) document.querySelector('.form-section').scrollIntoView({behavior:'smooth',block:'start'});
+  else window.scrollTo({top:0,behavior:'smooth'});
 }
 function frame(title, subtitle, body) {
+  panel.className = `form-card${scene === 'success' ? ' award-mode' : ''}`;
   panel.innerHTML = `<h2>${title}</h2><p class="subtitle">${subtitle}</p>${body}`;
 }
 function attachEyes() {
@@ -44,7 +56,8 @@ function attachEyes() {
     const input = panel.querySelector(`#${button.dataset.for}`);
     const visible = input.type === 'text';
     input.type = visible ? 'password' : 'text';
-    button.setAttribute('aria-label', `${visible ? 'Show' : 'Hide'} ${button.dataset.for === 'password' ? 'password' : 'confirmed password'}`);
+    const label = panel.querySelector(`label[for="${button.dataset.for}"]`)?.textContent.trim().toLowerCase() || 'password';
+    button.setAttribute('aria-label', `${visible ? 'Show' : 'Hide'} ${label}`);
     button.textContent = visible ? '◉' : '◎';
   }));
 }
@@ -75,7 +88,7 @@ function renderSignup() {
       <div class="field"><label for="password">Password</label><div class="input-wrap"><input id="password" type="password" placeholder="Create a password" autocomplete="new-password" required><button type="button" class="eye" data-for="password" aria-label="Show password">◉</button></div></div>
       <div class="rules" id="rules" hidden><p class="rules-title">Password requirements</p><ul id="ruleList"></ul></div>
       <div class="field"><label for="passwordAgain">Confirm password</label><div class="input-wrap"><input id="passwordAgain" type="password" placeholder="Confirm your password" autocomplete="new-password" required><button type="button" class="eye" data-for="passwordAgain" aria-label="Show confirmed password">◉</button></div></div>
-      <p class="demo-hint">This is a demo. Use a made-up password; nothing is sent or saved.</p>
+      <p class="demo-hint">This is a demo. Use a made-up password. Your answers stay in this tab until the final memory check.</p>
       <p class="form-notice" aria-live="polite"></p><button class="button button-primary full" type="submit">Create account</button>
     </form>`);
   attachEyes();
@@ -139,6 +152,7 @@ function renderSignup() {
       password.focus();
       return;
     }
+    enteredDetails = {email:address.toLowerCase(), password:password.value};
     form.reset();
     moveTo('captcha');
   });
@@ -208,7 +222,7 @@ function renderCaptcha() {
       checkbox.querySelector('span:last-child').textContent='Verified';
       checkbox.setAttribute('aria-label','Verified');
       panel.querySelector('.captcha-under-note').textContent='Thanks. Please continue.';
-      setTimeout(()=>moveTo('cookies'),700);
+      schedule(()=>moveTo('cookies'),700);
     });
   }
 }
@@ -248,47 +262,182 @@ function renderNotifications() {
     moveTo('terms');
   });
 }
+const termsChapters = [
+  {title:'The introductory introduction', clauses:[
+    'This is a parody demo. No account will be created, and the details you type are used only inside this browser tab for the final memory check. They are not submitted to a server or saved between visits. Reading beyond this sentence does not create a legal contract, although it may create a lasting impression.',
+    'The phrase “quick setup” describes an aspiration rather than a measurable unit of time. A quick setup may include a few questions, several questions about the previous questions, and a pause in which the interface appears to consider whether the previous answers were sufficiently enthusiastic.',
+    'By continuing to read, you acknowledge that a button labelled Continue may ask you to continue doing the thing you were already doing. A button labelled Final may be followed by another button with an even more final sounding label. These labels are intended for dramatic effect.',
+    'If a page asks you to confirm an email address twice, the second entry is presumed to contain the same letters in roughly the same order. The site may nevertheless request a third confirmation later, after you have had enough time to forget what you typed in the first two.'
+  ], mark:'I noticed the small acknowledgement in the introduction.'},
+  {title:'On verification and reasonable doubt', clauses:[
+    'Images used for verification may feature familiar street objects. A bicycle remains a bicycle when viewed from an inconvenient angle, a traffic light remains a traffic light while displaying amber, and a bus continues to qualify as a bus even when it looks as though it would rather be elsewhere.',
+    'A completed challenge may lead to another challenge. This does not imply that the first answer was wrong. It merely means the system has found a new way to be uncertain. The next challenge may reuse the same images because acquiring new ones would have taken additional time.',
+    'You are responsible for deciding whether an object appears in a tiny square. The operators of this fictional service reserve the right to ask whether the object does not appear in a square, appears in all squares, or is emotionally present despite being physically absent.',
+    'The verification checkbox is a theatrical device. It cannot determine whether you are a robot, a person, or a person who has spent so long on the internet that the distinction feels increasingly academic. It can, however, open another window.'
+  ], mark:'I have considered the possibility of another verification.'},
+  {title:'Preferences, notices, and other small print', clauses:[
+    'A preference can be described as optional while still requiring you to inspect its switch. Turning something off may require more effort than turning it on. The site apologises in advance for any feeling that the controls have a stronger preference than you do.',
+    'Necessary cookies in this demo are a subject of conversation rather than a real tracking system. The choices presented are part of the joke. Any apparent urgency in the wording of the preference screen is therefore entirely cosmetic, much like the certainty of a progress bar.',
+    'If you leave this page before finishing, the process may begin again when you return. This behaviour should not be interpreted as a motivational technique, although it has been observed to produce a surprising level of determination in some visitors.',
+    'Occasional phrases such as “one more thing” and “almost there” are not guarantees about distance to completion. They are expressions of optimism. The site may be optimistic on your behalf even when you would prefer it to be quiet.'
+  ], mark:'I found this tiny line among the preferences.'},
+  {title:'Progress, waiting, and confirmation', clauses:[
+    'Progress indicators can accelerate, decelerate, pause, and resume without providing a reliable measure of work. A percentage reflects what the interface currently wishes to communicate. It does not necessarily correspond to the amount of patience still required.',
+    'A request for confirmation may itself be followed by a request to confirm that confirmation. This sequence is considered a normal part of the demo. You may wonder whether the system heard you the first time. It did. It simply enjoys hearing you say it again.',
+    'Waiting periods are measured according to the clock in your current device. Staring at the number will not make it increase faster. Looking away may create the impression that it moved while you were not watching, which is a perfectly acceptable way to experience this page.',
+    'At some point, you may be asked to recall information you entered earlier. This is intended as a memory quiz, not a security feature. Please use a made-up password, and do not use a password from an account you actually care about.'
+  ], mark:'I acknowledge that a percentage can have feelings.'},
+  {title:'The concluding conclusion', clauses:[
+    'The word final, when used in a heading, is a stylistic flourish. A final step can contain several smaller steps. A final confirmation can have a final confirmation of its own. The visitor should interpret such language generously and avoid making appointments based on it.',
+    'If you locate every small acknowledgement in this document, scroll through the remaining text, remember your made-up details, and finish the process, you may receive a digital trophy. The trophy has no monetary value, though the patience it represents may feel expensive.',
+    'The trophy may be admired, celebrated, or shown to someone who has not yet attempted this process. It is not transferable to another tab. Refreshing the page may cause the trophy to disappear, but the memory of reaching it should remain available without an internet connection.',
+    'This is the end of the demo terms. There is no hidden clause after this paragraph. Please take a moment to appreciate that this sentence is, for once, exactly as final as it sounds.'
+  ]}
+];
 function renderTerms() {
-  frame('One final review','Please read and accept the terms below to continue.',`
-    <div class="terms-box" id="terms" tabindex="0" aria-label="Demo terms, scroll to bottom">
-      <h3>Terms of use</h3>
-      <p>1. This is a demo experience. No account is created, and no information entered on this page is submitted to a server.</p>
-      <p>2. You acknowledge that repeated confirmations are a familiar part of using the internet, even when you entered everything correctly the first time.</p>
-      <p>3. You understand that some verification puzzles may appear to repeat themselves.</p>
-      <p>4. You agree that a “quick setup” can mean many different things to many different websites.</p>
-      <p>5. You accept that progress indicators, if any, are estimates and are not a reliable promise of how soon you will finish.</p>
-      <p>6. You acknowledge that cookie preferences often require more attention than you intended to give them.</p>
-      <p>7. The end of these demo terms is now in sight. Thank you for scrolling all the way here.</p>
+  const chapters = termsChapters.map((chapter, chapterIndex) => `<section class="terms-chapter">
+    <h4>${chapter.title}</h4>${chapter.clauses.map((clause,index)=>`<p><span class="clause-number">${chapterIndex*4+index+1}.</span> ${clause}</p>`).join('')}
+    ${chapter.mark ? `<label class="terms-tiny-check"><input type="checkbox" class="terms-mark" aria-label="${chapter.mark}"><span>${chapter.mark}</span></label>` : ''}
+  </section>`).join('');
+  frame('One final review','Read carefully. Some of the small print wants an answer.',`
+    <div class="terms-topline"><span>TERMS OF USE</span><span>Scroll to read</span></div>
+    <div class="terms-box" id="terms" tabindex="0" aria-label="Demo terms. Scroll through each section and tick the small acknowledgements.">
+      <h3>Terms of use</h3><p class="terms-effective">Effective whenever you opened this page · Demo edition</p>${chapters}
     </div>
     <label class="check-row locked" id="agreementRow"><input id="agreement" type="checkbox" disabled> I have read and agree to the demo terms.</label>
     <p class="form-notice" aria-live="polite"></p><button type="button" class="button button-primary full" id="termsContinue">Continue</button>`);
-  const terms=panel.querySelector('#terms');
-  const check=panel.querySelector('#agreement');
-  terms.addEventListener('scroll',()=>{
-    if(terms.scrollTop+terms.clientHeight>=terms.scrollHeight-8){check.disabled=false;panel.querySelector('#agreementRow').classList.remove('locked');}
-  });
+  const terms = panel.querySelector('#terms');
+  const marks = [...panel.querySelectorAll('.terms-mark')];
+  const agreement = panel.querySelector('#agreement');
+  marks.slice(1).forEach(mark=>mark.disabled=true);
+  const updateScroll = () => {
+    const nextMark = marks.find(mark=>!mark.checked);
+    if (nextMark) {
+      const markPosition = nextMark.getBoundingClientRect().top - terms.getBoundingClientRect().top + terms.scrollTop;
+      const scrollLimit = Math.max(0, markPosition - terms.clientHeight + 100);
+      if (terms.scrollTop > scrollLimit + 1) terms.scrollTop = scrollLimit;
+      return;
+    }
+    if (terms.scrollTop + terms.clientHeight >= terms.scrollHeight - 8) {
+      agreement.disabled = false;
+      panel.querySelector('#agreementRow').classList.remove('locked');
+    }
+  };
+  marks.forEach((mark,index)=>mark.addEventListener('change',()=>{
+    mark.closest('.terms-tiny-check').classList.toggle('acknowledged',mark.checked);
+    if (marks[index+1]) marks[index+1].disabled = !mark.checked;
+    updateScroll();
+  }));
+  terms.addEventListener('scroll',updateScroll);
+  updateScroll();
   panel.querySelector('#termsContinue').addEventListener('click',()=>{
-    if(check.disabled) return notice('Please scroll to the end of the terms.');
-    if(!check.checked) return notice('Please tick the agreement box.');
+    if(marks.some(mark=>!mark.checked)) return notice('A few tiny acknowledgements are still waiting inside the terms.');
+    if(agreement.disabled) return notice('Please scroll through the final section.');
+    if(!agreement.checked) return notice('Please tick the agreement box.');
     moveTo('waiting');
   });
 }
 function renderWaiting() {
   frame('Setting things up','We are getting everything ready for you.',`
-    <div class="loading-number" id="loadNumber">0%</div><div class="loading-track" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="loading-fill" id="loadFill"></div></div><p class="loading-caption" id="loadCaption">This should only take a moment.</p><div id="waitingAction"></div>`);
-  let value=0;
-  waitTimer=setInterval(()=>{
-    if(scene!=='waiting'){clearInterval(waitTimer);return;}
-    value=Math.min(99,value+(value<70?12:value<94?4:1));
-    panel.querySelector('#loadNumber').textContent=`${value}%`;
-    panel.querySelector('#loadFill').style.width=`${value}%`;
+    <div class="loading-scene"><div class="loading-kicker">ACCOUNT SETUP</div><div class="loading-number" id="loadNumber">0%</div>
+    <div class="loading-track" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="loading-fill" id="loadFill"></div></div>
+    <p class="loading-caption" id="loadCaption" aria-live="polite">Carefully getting started...</p><div class="loading-dots" aria-hidden="true"><i></i><i></i><i></i></div></div>`);
+  const dialog = document.createElement('dialog');
+  dialog.id = 'certaintyDialog';
+  dialog.className = 'certainty-dialog';
+  dialog.addEventListener('cancel',event=>event.preventDefault());
+  document.body.append(dialog);
+  const setProgress = value => {
+    panel.querySelector('#loadNumber').textContent = `${value}%`;
+    panel.querySelector('#loadFill').style.width = `${value}%`;
     panel.querySelector('.loading-track').setAttribute('aria-valuenow',String(value));
-    if(value===99){clearInterval(waitTimer);panel.querySelector('#loadCaption').textContent='Just checking one more thing…';panel.querySelector('#waitingAction').innerHTML='<button type="button" class="button button-primary full" id="confirmPresence">I’m still here</button>';panel.querySelector('#confirmPresence').addEventListener('click',()=>{panel.querySelector('#loadNumber').textContent='100%';panel.querySelector('#loadFill').style.width='100%';setTimeout(()=>moveTo('success'),500);});}
-  },420);
+  };
+  const confirmations = [
+    {eyebrow:'A QUICK CONFIRMATION', title:'Are you sure you want to finish?', body:'Everything is ready. We just need to make sure you mean it.', button:'Yes, I’m sure'},
+    {eyebrow:'CONFIRMATION OF CONFIRMATION', title:'Are you sure you’re sure?', body:'We received your answer. Please confirm the answer to the confirmation.', button:'I’m still sure'},
+    {eyebrow:'A MOMENT LATER', title:'Still sure?', body:'We gave you a little time to reconsider. Your previous confirmations remain on file for this tab only.', button:'Yes. Finish it.'}
+  ];
+  function ask(index) {
+    if (scene !== 'waiting') return;
+    const item = confirmations[index];
+    dialog.innerHTML = `<span class="certainty-eyebrow">${item.eyebrow}</span><div class="certainty-icon" aria-hidden="true">?</div><h3>${item.title}</h3><p>${item.body}</p><button type="button" class="button button-primary full" id="certaintyYes">${item.button}</button>`;
+    dialog.showModal();
+    dialog.querySelector('#certaintyYes').addEventListener('click',()=>{
+      dialog.close();
+      if(index===0) schedule(()=>ask(1),350);
+      else if(index===1){panel.querySelector('#loadCaption').textContent='Giving that answer a moment to settle...';schedule(()=>ask(2),2600);}
+      else {setProgress(100);panel.querySelector('#loadCaption').textContent='Finally complete. Almost.';schedule(()=>moveTo('quiz'),850);}
+    });
+  }
+  const phases = [
+    {duration:6200, start:0, end:23, caption:'Carefully getting started...'},
+    {duration:1700, start:23, end:82, caption:'Oh, now we’re moving.'},
+    {duration:7900, start:82, end:99, caption:'Just one last tiny thing...'}
+  ];
+  const total = phases.reduce((sum,phase)=>sum+phase.duration,0);
+  const started = performance.now();
+  waitTimer = setInterval(()=>{
+    if(scene!=='waiting'){clearInterval(waitTimer);return;}
+    let elapsed = Math.min(performance.now()-started,total);
+    for(const phase of phases){
+      if(elapsed<=phase.duration){
+        setProgress(Math.round(phase.start+(phase.end-phase.start)*elapsed/phase.duration));
+        panel.querySelector('#loadCaption').textContent=phase.caption;
+        break;
+      }
+      elapsed-=phase.duration;
+    }
+    if(performance.now()-started>=total){
+      clearInterval(waitTimer);
+      setProgress(99);
+      panel.querySelector('#loadCaption').textContent='Waiting for your final confirmation...';
+      schedule(()=>ask(0),450);
+    }
+  },90);
+}
+function renderQuiz() {
+  if(!enteredDetails) return moveTo('signup');
+  frame('A quick memory check','You entered these details a while ago. Do you still remember them?',`
+    <div class="quiz-badge"><span aria-hidden="true">✦</span> THE ACTUAL FINAL STEP</div>
+    <form id="quizForm" novalidate>
+      <div class="field"><label for="rememberedEmail">The email address you used</label><input id="rememberedEmail" type="email" placeholder="From memory, please" autocomplete="off" required></div>
+      <div class="field"><label for="rememberedPassword">Your made-up password</label><div class="input-wrap"><input id="rememberedPassword" type="password" placeholder="No peeking" autocomplete="off" required><button type="button" class="eye" data-for="rememberedPassword" aria-label="Show remembered password">◉</button></div></div>
+      <p class="quiz-hint">Paste is unavailable, naturally. Your answer stays in this tab and is cleared when you finish.</p>
+      <p class="form-notice" aria-live="polite"></p><button class="button button-primary full" type="submit">Claim my reward</button>
+    </form>`);
+  attachEyes();
+  const email = panel.querySelector('#rememberedEmail');
+  const password = panel.querySelector('#rememberedPassword');
+  blockPaste(email);
+  blockPaste(password);
+  panel.querySelector('#quizForm').addEventListener('submit',event=>{
+    event.preventDefault();
+    if(email.value.trim().toLowerCase()!==enteredDetails.email || password.value!==enteredDetails.password){
+      password.value='';
+      notice('Not quite. Think back to what you entered at the start.');
+      password.focus();
+      return;
+    }
+    enteredDetails=null;
+    moveTo('success');
+  });
 }
 function renderSuccess() {
-  frame('You’re all set','Thanks for your patience. You have reached the end of the demo.',`
-    <div class="success-icon" aria-hidden="true">✓</div><p class="summary">No account was created, and nothing you typed was sent anywhere. The only thing you earned is the satisfaction of finishing.</p><button type="button" class="button button-primary full" id="startAgain">Start again</button>`);
+  frame('The Trophy of Patience','You made it through every last check.',`
+    <div class="trophy-stage"><div class="trophy-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="trophy-halo"><svg class="trophy-art" viewBox="0 0 240 240" role="img" aria-label="Golden trophy">
+        <defs><linearGradient id="goldCup" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1aa"/><stop offset=".38" stop-color="#f6bd49"/><stop offset=".72" stop-color="#d78920"/><stop offset="1" stop-color="#ffe383"/></linearGradient><linearGradient id="goldBase" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#aa6322"/><stop offset=".5" stop-color="#f8d276"/><stop offset="1" stop-color="#a7631e"/></linearGradient></defs>
+        <path d="M65 52H37v24c0 28 17 47 47 48M175 52h28v24c0 28-17 47-47 48" fill="none" stroke="#e5a738" stroke-width="13" stroke-linecap="round"/>
+        <path d="M66 43h108v49c0 43-22 72-54 72S66 135 66 92V43Z" fill="url(#goldCup)" stroke="#c18426" stroke-width="3"/>
+        <path d="M83 55h20c-12 24-12 54-2 84-15-11-18-37-18-57V55Z" fill="#fff6bd" opacity=".55"/>
+        <path d="m120 73 7 15 17 2-12 12 3 17-15-8-15 8 3-17-12-12 17-2 7-15Z" fill="#fff6cf" stroke="#e4a237" stroke-width="2"/>
+        <path d="M112 162h16v25h-16z" fill="url(#goldBase)"/><path d="M91 184h58v12H91zM78 196h84v17H78z" fill="url(#goldBase)" stroke="#a66a27" stroke-width="2"/>
+        <path d="M102 202h36v8h-36z" fill="#7b4a20" opacity=".7"/>
+      </svg></div><p class="trophy-overline">OFFICIALLY AWARDED</p><h3>For extraordinary persistence</h3>
+      <p class="trophy-description">You survived the password rules, the tiny pictures, the tiny terms, and the final final confirmation.</p>
+      <div class="trophy-stamp">PATIENCE LEVEL: LEGENDARY <span aria-hidden="true">✦</span></div>
+    </div><p class="summary">No account was created. Your made-up details have been cleared from this tab. The trophy, however, is yours to admire.</p>
+    <button type="button" class="button button-primary full" id="startAgain">Try the whole thing again</button>`);
   panel.querySelector('#startAgain').addEventListener('click',()=>moveTo('signup'));
 }
 function renderLogin() {
@@ -298,7 +447,7 @@ function renderLogin() {
   panel.querySelector('#backToSignup').addEventListener('click',()=>moveTo('signup'));
 }
 function render() {
-  ({signup:renderSignup,captcha:renderCaptcha,cookies:renderCookies,notifications:renderNotifications,terms:renderTerms,waiting:renderWaiting,success:renderSuccess,login:renderLogin})[scene]();
+  ({signup:renderSignup,captcha:renderCaptcha,cookies:renderCookies,notifications:renderNotifications,terms:renderTerms,waiting:renderWaiting,quiz:renderQuiz,success:renderSuccess,login:renderLogin})[scene]();
 }
 const dialog=document.querySelector('#infoDialog');
 for(const id of ['helpButton','footerHelp']) document.getElementById(id).addEventListener('click',()=>dialog.showModal());
