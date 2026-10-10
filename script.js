@@ -5,6 +5,8 @@ let visibleRuleCount = 0;
 let toastTimer;
 let waitTimer;
 let enteredDetails = null;
+let chosenHandle = '';
+let awardId = '';
 const pendingTimers = new Set();
 function schedule(callback, delay) {
   const timer = setTimeout(() => { pendingTimers.delete(timer); callback(); }, delay);
@@ -42,7 +44,7 @@ function moveTo(next) {
   pendingTimers.clear();
   document.querySelector('#captchaDialog')?.remove();
   document.querySelector('#certaintyDialog')?.remove();
-  if (next === 'signup' || next === 'login') enteredDetails = null;
+  if (next === 'signup' || next === 'login') { enteredDetails = null; chosenHandle = ''; awardId = ''; }
   render();
   if (window.innerWidth < 761) document.querySelector('.form-section').scrollIntoView({behavior:'smooth',block:'start'});
   else window.scrollTo({top:0,behavior:'smooth'});
@@ -285,9 +287,74 @@ function renderCaptcha() {
       checkbox.querySelector('span:last-child').textContent='Verified';
       checkbox.setAttribute('aria-label','Verified');
       panel.querySelector('.captcha-under-note').textContent='Thanks. Please continue.';
-      schedule(()=>moveTo('cookies'),700);
+      schedule(()=>moveTo('username'),700);
     });
   }
+}
+function renderUsername() {
+  let unavailable = '';
+  frame('Choose your username','A unique name helps everyone know it is you.',`
+    <form id="usernameForm" novalidate>
+      <div class="field"><label for="username">Username</label><div class="handle-input"><span aria-hidden="true">@</span><input id="username" type="text" placeholder="Your username" autocomplete="off" maxlength="18" spellcheck="false" required></div></div>
+      <p class="field-help">4–18 letters, numbers, or underscores. No spaces, because apparently that matters.</p>
+      <div class="availability" id="availability" role="status" aria-live="polite"></div>
+      <p class="form-notice" aria-live="polite"></p><button class="button button-primary full" type="submit">Check availability</button>
+    </form>`);
+  const form=panel.querySelector('#usernameForm');
+  const input=panel.querySelector('#username');
+  const status=panel.querySelector('#availability');
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    const value=input.value.trim();
+    if(!/^[A-Za-z0-9_]{4,18}$/.test(value)) return notice('Use 4–18 letters, numbers, or underscores.');
+    if(!unavailable){
+      unavailable=value.toLowerCase();
+      const suggestion=`${value.slice(0,16)}_2`;
+      status.innerHTML=`<strong>That username is already taken.</strong><span>Every good one is. Try a suggested alternative:</span><button type="button" class="suggestion" id="suggestHandle"></button>`;
+      status.classList.add('visible');
+      status.querySelector('#suggestHandle').textContent=`@${suggestion}`;
+      status.querySelector('#suggestHandle').addEventListener('click',()=>{input.value=suggestion;input.focus();notice('Suggestion added. Check availability again.','info');});
+      notice('Sorry, somebody got there first.','info');
+      return;
+    }
+    if(value.toLowerCase()===unavailable) return notice('Still taken. Please choose a different username.');
+    chosenHandle=value;
+    moveTo('code');
+  });
+}
+function renderCode() {
+  let currentCode='482913';
+  let expired=false;
+  frame('Check your inbox','Enter the six-digit code to verify your address.',`
+    <div class="demo-inbox"><div class="inbox-top"><span class="inbox-icon" aria-hidden="true">✉</span><div><strong>Demo inbox</strong><small>No email is sent. Open this simulated message for your code.</small></div></div><button type="button" class="link-button" id="openInbox" aria-expanded="false">Open verification email</button><div class="inbox-message" id="inboxMessage" hidden><div class="inbox-meta">From: mildly &lt;hello@example.invalid&gt;</div><p>Your verification code is</p><strong id="inboxCode">482913</strong><small>Valid until the site decides otherwise.</small></div></div>
+    <form id="codeForm" novalidate><div class="field"><label for="verificationCode">Verification code</label><input id="verificationCode" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="off" placeholder="Six digits" required></div><p class="form-notice" aria-live="polite"></p><button class="button button-primary full" type="submit">Verify code</button></form>`);
+  const inbox=panel.querySelector('#inboxMessage');
+  const input=panel.querySelector('#verificationCode');
+  const opener=panel.querySelector('#openInbox');
+  blockPaste(input);
+  opener.addEventListener('click',()=>{
+    const opening=inbox.hidden;
+    inbox.hidden=!opening;
+    opener.textContent=opening?'Close verification email':'Open verification email';
+    opener.setAttribute('aria-expanded',String(opening));
+  });
+  panel.querySelector('#codeForm').addEventListener('submit',event=>{
+    event.preventDefault();
+    if(input.value!==currentCode) return notice('That code does not match the latest email.');
+    if(!expired){
+      expired=true;
+      currentCode='734206';
+      input.value='';
+      panel.querySelector('#inboxCode').textContent=currentCode;
+      notice('That code expired just as you entered it. A new demo email has arrived.','info');
+      inbox.hidden=false;
+      opener.textContent='Close verification email';
+      opener.setAttribute('aria-expanded','true');
+      input.focus();
+      return;
+    }
+    moveTo('cookies');
+  });
 }
 function renderCookies() {
   frame('Your privacy matters','Choose how you would like us to use cookies.',`
@@ -322,6 +389,20 @@ function renderNotifications() {
   }));
   panel.querySelector('#continueMessages').addEventListener('click',()=>{
     if(switches.some(button=>button.getAttribute('aria-pressed')==='true')) return notice('Please review all three notification settings before continuing.');
+    moveTo('survey');
+  });
+}
+function renderSurvey() {
+  frame('A little about you','Help us tailor your experience. This should only take a moment.',`
+    <form id="surveyForm" novalidate>
+      <div class="field"><label for="visitReason">What brings you here today?</label><select id="visitReason" required><option value="">Choose one</option><option>Curiosity</option><option>Peer pressure</option><option>I have come too far to leave</option></select></div>
+      <fieldset class="survey-options"><legend>How did you hear about us?</legend><label><input type="radio" name="discovery" value="internet"> The internet</label><label><input type="radio" name="discovery" value="other"> Somewhere else on the internet</label><label><input type="radio" name="discovery" value="unsure"> I no longer remember</label></fieldset>
+      <p class="form-notice" aria-live="polite"></p><button class="button button-primary full" type="submit">Save my answers</button><button class="link-button survey-skip" type="button" id="skipSurvey">Skip for now</button>
+    </form>`);
+  panel.querySelector('#skipSurvey').addEventListener('click',()=>notice('This optional step is required to continue. Sorry about the wording.','info'));
+  panel.querySelector('#surveyForm').addEventListener('submit',event=>{
+    event.preventDefault();
+    if(!panel.querySelector('#visitReason').value || !panel.querySelector('input[name="discovery"]:checked')) return notice('Please answer both questions before continuing.');
     moveTo('terms');
   });
 }
@@ -352,8 +433,8 @@ const termsChapters = [
   ], mark:'I acknowledge that a percentage can have feelings.'},
   {title:'The concluding conclusion', clauses:[
     'The word final, when used in a heading, is a stylistic flourish. A final step can contain several smaller steps. A final confirmation can have a final confirmation of its own. The visitor should interpret such language generously and avoid making appointments based on it.',
-    'If you locate every small acknowledgement in this document, scroll through the remaining text, remember your made-up details, and finish the process, you may receive a digital trophy. The trophy has no monetary value, though the patience it represents may feel expensive.',
-    'The trophy may be admired, celebrated, or shown to someone who has not yet attempted this process. It is not transferable to another tab. Refreshing the page may cause the trophy to disappear, but the memory of reaching it should remain available without an internet connection.',
+    'If you locate every small acknowledgement in this document, scroll through the remaining text, remember your made-up details, and finish the process, you may receive a digital trophy and a downloadable Patience Pass. Neither has monetary value, though the patience they represent may feel expensive.',
+    'The trophy may be admired, celebrated, or shown to someone who has not yet attempted this process. The downloadable pass is yours to keep, while the break room is available in this tab after completion. Refreshing the page may cause the trophy to disappear, but the memory of reaching it should remain available without an internet connection.',
     'This is the end of the demo terms. There is no hidden clause after this paragraph. Please take a moment to appreciate that this sentence is, for once, exactly as final as it sounds.'
   ], mark:'I really did reach the end of the document.'}
 ];
@@ -476,7 +557,21 @@ function renderQuiz() {
     moveTo('success');
   });
 }
+function downloadPatiencePass() {
+  if(!awardId) return;
+  const name=chosenHandle || 'patient_human';
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc"><title id="title">Patience Pass awarded to ${name}</title><desc id="desc">A personalised digital certificate of persistence.</desc><defs><radialGradient id="bg"><stop stop-color="#203e66"/><stop offset="1" stop-color="#07172d"/></radialGradient><linearGradient id="gold" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff0b5"/><stop offset=".52" stop-color="#d59b40"/><stop offset="1" stop-color="#f7d889"/></linearGradient><pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="#d8b66d" opacity=".27"/></pattern></defs><rect width="1200" height="675" fill="url(#bg)"/><rect width="1200" height="675" fill="url(#dots)"/><rect x="23" y="23" width="1154" height="629" rx="18" fill="none" stroke="#d7ad61" stroke-width="2"/><rect x="35" y="35" width="1130" height="605" rx="11" fill="none" stroke="#d7ad61" stroke-opacity=".38"/><circle cx="600" cy="191" r="91" fill="#d2a351" opacity=".12"/><path d="M561 132h78v62c0 32-16 53-39 53s-39-21-39-53v-62Z" fill="url(#gold)"/><path d="M561 143h-24v30c0 20 13 32 33 33m69-63h24v30c0 20-13 32-33 33" fill="none" stroke="#d8a34a" stroke-width="9"/><path d="M596 247h8v26h-8zm-23 26h54v12h-54z" fill="#d8a34a"/><text x="600" y="331" fill="#e7c783" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" letter-spacing="6">OFFICIALLY UNLOCKED</text><text x="600" y="403" fill="#fff4da" text-anchor="middle" font-family="Georgia,serif" font-size="64">The Patience Pass</text><text x="600" y="458" fill="#cfdbeb" text-anchor="middle" font-family="Arial,sans-serif" font-size="25">Awarded to @${name}</text><path d="M396 494h408" stroke="#d8aa5d" stroke-opacity=".6"/><text x="600" y="537" fill="#edd3a0" text-anchor="middle" font-family="Arial,sans-serif" font-size="18">SURVIVED EVERY CHECK, EVERY BOX, EVERY “ONE LAST THING”</text><text x="94" y="607" fill="#91a9c7" font-family="Arial,sans-serif" font-size="17">${currentYear} · MILDLY INFURIATING</text><text x="1106" y="607" text-anchor="end" fill="#91a9c7" font-family="Arial,sans-serif" font-size="17">PASS #${awardId}</text></svg>`;
+  const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=`patience-pass-${name.toLowerCase()}.svg`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function renderSuccess() {
+  if(!awardId) awardId=Math.random().toString(36).slice(2,8).toUpperCase();
   frame('The Trophy of Patience','You made it through every last check.',`
     <div class="trophy-stage"><div class="trophy-sparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="trophy-ribbon"><span aria-hidden="true">✦</span> RARE ACHIEVEMENT UNLOCKED <span aria-hidden="true">✦</span></div>
@@ -492,9 +587,36 @@ function renderSuccess() {
       <p class="trophy-description">You survived the password rules, the confusing squares, the suspicious terms, and the final final confirmation.</p>
       <div class="trophy-stamp">PATIENCE LEVEL: LEGENDARY <span aria-hidden="true">✦</span></div>
       <div class="trophy-plaque"><span>THE ${currentYear} PATIENCE AWARD</span><strong>No shortcuts. No mercy. You made it.</strong></div>
-    </div><p class="summary">No account was created. Your made-up details have been cleared from this tab. The trophy, however, is yours to admire.</p>
+    </div><p class="summary">No account was created. Your made-up email and password have been cleared from this tab.</p>
+    <div class="prize-card"><span class="prize-kicker">YOUR ACTUAL PRIZE</span><h3>A pass you can keep.</h3><p>Download a personalised certificate, then visit the break room to pop some bubbles. You earned both.</p><div class="prize-actions"><button type="button" class="button button-primary" id="downloadPass">Download my pass ↓</button><button type="button" class="button button-secondary" id="openBreakRoom">Enter the break room →</button></div><small>Digital prizes, no account needed. Pass #${awardId}</small></div>
     <button type="button" class="button button-primary full" id="startAgain">Try the whole thing again</button>`);
+  panel.querySelector('#downloadPass').addEventListener('click',downloadPatiencePass);
+  panel.querySelector('#openBreakRoom').addEventListener('click',()=>moveTo('prize'));
   panel.querySelector('#startAgain').addEventListener('click',()=>moveTo('signup'));
+}
+function renderPrize() {
+  if(!awardId) return moveTo('signup');
+  frame('The break room','No forms. No confirmation. Just something satisfying.',`
+    <div class="break-room"><div class="break-room-head"><span>UNLIMITED BUBBLE WRAP</span><strong id="bubbleCount" aria-live="polite">0 / 24 popped</strong></div><div class="bubble-sheet" role="group" aria-label="Bubble wrap">${Array.from({length:24},(_,index)=>`<button class="bubble" type="button" aria-label="Bubble ${index+1}" aria-pressed="false"></button>`).join('')}</div><p id="bubbleMessage">Go on. Pop every one.</p><button type="button" class="link-button" id="resetBubbles">Fresh sheet, please</button></div>
+    <div class="break-actions"><button type="button" class="button button-primary" id="downloadAgain">Download my Patience Pass ↓</button><button type="button" class="button button-secondary" id="backToTrophy">Back to trophy</button></div>`);
+  let popped=0;
+  const bubbles=[...panel.querySelectorAll('.bubble')];
+  bubbles.forEach(bubble=>bubble.addEventListener('click',()=>{
+    if(bubble.classList.contains('popped')) return;
+    bubble.classList.add('popped');
+    bubble.setAttribute('aria-pressed','true');
+    popped++;
+    panel.querySelector('#bubbleCount').textContent=`${popped} / 24 popped`;
+    if(popped===24) panel.querySelector('#bubbleMessage').textContent='Beautiful. The internet can be nice sometimes.';
+  }));
+  panel.querySelector('#resetBubbles').addEventListener('click',()=>{
+    bubbles.forEach(bubble=>{bubble.classList.remove('popped');bubble.setAttribute('aria-pressed','false');});
+    popped=0;
+    panel.querySelector('#bubbleCount').textContent='0 / 24 popped';
+    panel.querySelector('#bubbleMessage').textContent='A fresh sheet. No waiting required.';
+  });
+  panel.querySelector('#downloadAgain').addEventListener('click',downloadPatiencePass);
+  panel.querySelector('#backToTrophy').addEventListener('click',()=>moveTo('success'));
 }
 function renderLogin() {
   frame('Welcome back','Sign in to continue.',`
@@ -503,7 +625,7 @@ function renderLogin() {
   panel.querySelector('#backToSignup').addEventListener('click',()=>moveTo('signup'));
 }
 function render() {
-  ({signup:renderSignup,captcha:renderCaptcha,cookies:renderCookies,notifications:renderNotifications,terms:renderTerms,waiting:renderWaiting,quiz:renderQuiz,success:renderSuccess,login:renderLogin})[scene]();
+  ({signup:renderSignup,captcha:renderCaptcha,username:renderUsername,code:renderCode,cookies:renderCookies,notifications:renderNotifications,survey:renderSurvey,terms:renderTerms,waiting:renderWaiting,quiz:renderQuiz,success:renderSuccess,prize:renderPrize,login:renderLogin})[scene]();
 }
 const dialog=document.querySelector('#infoDialog');
 for(const id of ['helpButton','footerHelp']) document.getElementById(id).addEventListener('click',()=>dialog.showModal());
