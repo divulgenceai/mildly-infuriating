@@ -1,7 +1,7 @@
 const panel = document.querySelector('#panel');
 const toast = document.querySelector('#toast');
 let scene = 'signup';
-let revealedRule = -1;
+let visibleRuleCount = 0;
 let toastTimer;
 let waitTimer;
 
@@ -47,17 +47,26 @@ function attachEyes() {
     button.textContent = visible ? '◉' : '◎';
   }));
 }
+const currentYear = String(new Date().getFullYear());
 const passwordRules = [
   {text:'Use at least 10 characters.', test:value=>value.length>=10},
   {text:'Include an uppercase letter.', test:value=>/[A-Z]/.test(value)},
   {text:'Include a number.', test:value=>/\d/.test(value)},
   {text:'Include a special character.', test:value=>/[^\w\s]/.test(value)},
+  {text:'Include a lowercase letter, too.', test:value=>/[a-z]/.test(value)},
   {text:'Include the word “mild”.', test:value=>/mild/i.test(value)},
   {text:'End with an exclamation mark.', test:value=>value.endsWith('!')},
+  {text:`Include the current year (${currentYear}).`, test:value=>value.includes(currentYear)},
+  {text:'Include exactly one hyphen.', test:value=>(value.match(/-/g)||[]).length===1},
+  {text:'Include the word “please”.', test:value=>/please/i.test(value)},
+  {text:'Make all the digits add up to 15.', test:value=>[...value].filter(char=>/\d/.test(char)).reduce((sum,char)=>sum+Number(char),0)===15},
+  {text:'Use an odd number of characters.', test:value=>value.length%2===1},
+  {text:'Do not repeat a character three times in a row.', test:value=>!(/(.)\1\1/i.test(value))},
   {text:'Do not use spaces.', test:value=>!(/\s/.test(value))}
 ];
+const initialRuleCount = 4;
 function renderSignup() {
-  revealedRule = -1;
+  visibleRuleCount = 0;
   frame('Create your account','Enter your details to get started.',`
     <form id="signupForm" novalidate>
       <div class="field"><label for="email">Email address</label><input id="email" type="email" placeholder="you@example.com" autocomplete="off" required></div>
@@ -78,9 +87,26 @@ function renderSignup() {
   blockCopy(email); blockCopy(password);
   const updateRules = () => {
     panel.querySelectorAll('#ruleList li').forEach(row => {
-      const met = passwordRules[Number(row.dataset.rule)].test(password.value);
+      const rule = passwordRules[Number(row.dataset.rule)];
+      const met = rule.test(password.value);
       row.classList.toggle('met',met);
+      row.setAttribute('aria-label',`${met ? 'Met' : 'Not met'}: ${rule.text}`);
     });
+  };
+  const revealThrough = count => {
+    const list = panel.querySelector('#ruleList');
+    for (let index=visibleRuleCount; index<count; index++) {
+      const row = document.createElement('li');
+      row.dataset.rule = String(index);
+      row.textContent = passwordRules[index].text;
+      list.append(row);
+    }
+    visibleRuleCount = count;
+    panel.querySelector('#rules').hidden = false;
+    updateRules();
+    passwordAgain.value = '';
+    notice('There is one more thing. Please confirm your password again.','info');
+    password.focus();
   };
   password.addEventListener('input', () => {
     if (passwordAgain.value) { passwordAgain.value=''; notice('Please confirm your updated password.','info'); }
@@ -94,22 +120,18 @@ function renderSignup() {
     if (!password.value) return notice('Enter a password to continue.');
     if (password.value !== passwordAgain.value) return notice('The passwords do not match. Please type it again.');
 
-    if (revealedRule >= 0 && !passwordRules[revealedRule].test(password.value)) {
-      notice(passwordRules[revealedRule].text);
+    if (visibleRuleCount === 0) {
+      revealThrough(initialRuleCount);
+      return;
+    }
+    const unmet = passwordRules.slice(0,visibleRuleCount).find(rule => !rule.test(password.value));
+    if (unmet) {
+      notice(unmet.text);
       password.focus();
       return;
     }
-    if (revealedRule < passwordRules.length - 1) {
-      revealedRule++;
-      panel.querySelector('#rules').hidden = false;
-      const rule = document.createElement('li');
-      rule.dataset.rule = String(revealedRule);
-      rule.textContent = passwordRules[revealedRule].text;
-      panel.querySelector('#ruleList').append(rule);
-      updateRules();
-      passwordAgain.value = '';
-      notice('One more password requirement. Please confirm your password again.','info');
-      password.focus();
+    if (visibleRuleCount < passwordRules.length) {
+      revealThrough(visibleRuleCount+1);
       return;
     }
     form.reset();
