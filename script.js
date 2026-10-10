@@ -32,6 +32,7 @@ function blockCopy(input) {
 function moveTo(next) {
   scene = next;
   clearInterval(waitTimer);
+  document.querySelector('#captchaDialog')?.remove();
   render();
   if (window.innerWidth < 761) document.querySelector('.form-section').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -144,37 +145,72 @@ function renderSignup() {
 }
 
 const challenges = [
-  {name:'traffic lights', icons:['🚦','🚗','🌳','🏠','🚦','🚌','🚲','🚦','☁️'], answer:[0,4,7]},
-  {name:'bicycles', icons:['🚗','🚲','🌳','🚲','🚦','🏠','☁️','🚲','🚌'], answer:[1,3,7]}
+  {name:'traffic lights', detail:'Select all squares with traffic lights.', answer:[0,4,7]},
+  {name:'bicycles', detail:'Please complete this additional check.', answer:[1,3,6]},
+  {name:'anything that is not a bus', detail:'Yes, the traffic lights count again.', answer:[0,1,3,4,6,7]},
+  {name:'every single square', detail:'We just want to be absolutely certain.', answer:[0,1,2,3,4,5,6,7,8]}
 ];
 function renderCaptcha() {
   let challengeIndex = 0;
   let chosen = new Set();
   let refreshOffset = 0;
-  function paint() {
+  frame('Confirm it’s you','We just need to run a quick security check.',`
+    <div class="captcha-widget">
+      <button type="button" class="captcha-checkbox" id="robotCheck" aria-label="I'm not a robot" aria-haspopup="dialog" aria-expanded="false"><span class="captcha-checkbox-square" aria-hidden="true"></span><span>I'm not a robot</span></button>
+      <div class="captcha-widget-brand" aria-hidden="true"><span class="captcha-widget-mark">m</span><small>mildly verify<br><span>Privacy · Terms</span></small></div>
+    </div>
+    <p class="captcha-under-note">Please complete verification to continue.</p>`);
+  const checkbox = panel.querySelector('#robotCheck');
+  const dialog = document.createElement('dialog');
+  dialog.id = 'captchaDialog';
+  dialog.className = 'captcha-dialog';
+  document.body.append(dialog);
+  dialog.addEventListener('close', () => checkbox.setAttribute('aria-expanded','false'));
+  checkbox.addEventListener('click', () => {
+    checkbox.setAttribute('aria-expanded','true');
+    paint();
+    dialog.showModal();
+  });
+  function paint(message = '') {
     const current = challenges[challengeIndex];
-    const icons = current.icons.map((_, index) => current.icons[(index + refreshOffset) % current.icons.length]);
-    const answers = current.answer.map(index => (index - refreshOffset + current.icons.length) % current.icons.length);
-    frame('Confirm it’s you','We just need to run a quick security check.',`
-      <div class="captcha-intro"><span>Select all images containing</span><strong>${current.name}</strong></div>
-      <div class="captcha-grid" role="group" aria-label="Image challenge">${icons.map((icon,index)=>`<button type="button" class="tile" data-tile="${index}" aria-label="Tile ${index+1}: ${icon}" aria-pressed="false">${icon}</button>`).join('')}</div>
-      <div class="captcha-tools"><span>Select every matching image.</span><button type="button" class="link-button" id="refreshChallenge">Get a new layout</button></div>
-      <p class="form-notice" aria-live="polite"></p><button type="button" class="button button-primary full" id="verify">Verify</button>`);
-    panel.querySelectorAll('.tile').forEach(tile => tile.addEventListener('click', () => {
+    dialog.innerHTML = `
+      <div class="captcha-dialog-header"><span>Select all images with</span><strong>${current.name}</strong><small>${current.detail}</small></div>
+      <div class="captcha-dialog-body"><div class="captcha-grid" role="group" aria-label="Image challenge">${Array.from({length:9},(_,index)=>{
+        const photo=(index+refreshOffset)%9;
+        return `<button type="button" class="tile" data-tile="${index}" data-photo="${photo}" aria-label="Image ${index+1}" aria-pressed="false" style="background-position:${(photo%3)*50}% ${Math.floor(photo/3)*50}%"></button>`;
+      }).join('')}</div><p class="captcha-message" role="status" aria-live="polite">${message}</p></div>
+      <div class="captcha-dialog-footer"><div class="captcha-dialog-tools"><button type="button" id="refreshChallenge" aria-label="Get a new image layout" title="Get a new layout">↻</button><button type="button" id="challengeHelp" aria-label="Challenge help" title="Help">?</button></div><button type="button" class="captcha-verify" id="verify">VERIFY</button></div>`;
+    dialog.querySelectorAll('.tile').forEach(tile => tile.addEventListener('click', () => {
       const index=Number(tile.dataset.tile);
       chosen.has(index) ? chosen.delete(index) : chosen.add(index);
       tile.classList.toggle('selected',chosen.has(index));
       tile.setAttribute('aria-pressed',String(chosen.has(index)));
     }));
-    panel.querySelector('#refreshChallenge').addEventListener('click', () => {chosen.clear();refreshOffset=(refreshOffset+1)%9;paint();notify('The images have been rearranged.');});
-    panel.querySelector('#verify').addEventListener('click', () => {
+    dialog.querySelector('#refreshChallenge').addEventListener('click', () => {chosen.clear();refreshOffset=(refreshOffset+1)%9;paint('The images have been rearranged.');});
+    dialog.querySelector('#challengeHelp').addEventListener('click', () => {dialog.querySelector('.captcha-message').textContent='Select every square matching the instruction above, then press VERIFY.';});
+    dialog.querySelector('#verify').addEventListener('click', () => {
+      const answers = [...dialog.querySelectorAll('.tile')].filter(tile=>current.answer.includes(Number(tile.dataset.photo))).map(tile=>Number(tile.dataset.tile));
       const right=answers.length===chosen.size && answers.every(index=>chosen.has(index));
-      if(!right) return notice('Please check your selection and try again.');
-      if(challengeIndex===0){challengeIndex=1;refreshOffset=0;chosen.clear();paint();notify('Please verify the updated image.');}
-      else moveTo('cookies');
+      if(!right){chosen.clear();refreshOffset=(refreshOffset+1)%9;paint('That was close. Please try the new layout.');return;}
+      challengeIndex++;
+      refreshOffset=(refreshOffset+2)%9;
+      chosen.clear();
+      if(challengeIndex<challenges.length) paint('One more quick check.');
+      else paintFinal();
     });
   }
-  paint();
+  function paintFinal() {
+    dialog.innerHTML=`<div class="captcha-dialog-header"><span>Verification complete</span><strong>Almost.</strong><small>There is one last confirmation.</small></div><div class="captcha-final"><div class="captcha-final-icon" aria-hidden="true">✓</div><p>Please confirm that you meant to finish verifying.</p><button type="button" class="captcha-verify" id="finalVerify">CONFIRM VERIFICATION</button></div>`;
+    dialog.querySelector('#finalVerify').addEventListener('click',()=>{
+      dialog.close();
+      checkbox.classList.add('verified');
+      checkbox.querySelector('.captcha-checkbox-square').textContent='✓';
+      checkbox.querySelector('span:last-child').textContent='Verified';
+      checkbox.setAttribute('aria-label','Verified');
+      panel.querySelector('.captcha-under-note').textContent='Thanks. Please continue.';
+      setTimeout(()=>moveTo('cookies'),700);
+    });
+  }
 }
 function renderCookies() {
   frame('Your privacy matters','Choose how you would like us to use cookies.',`
