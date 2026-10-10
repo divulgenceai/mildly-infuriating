@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="A deceptively simple signup experience.">
+  <title>Create your account — mildly</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="mildly home and restart">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>mildly</span>
+    </a>
+    <nav class="header-actions" aria-label="Main navigation">
+      <button type="button" class="header-link" id="helpButton">Help</button>
+      <button type="button" class="header-link login-link" id="loginButton">Log in</button>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="welcome" aria-labelledby="welcomeTitle">
+      <div class="welcome-content">
+        <h1 id="welcomeTitle">A simpler way<br>to get started.</h1>
+        <p>Keep your ideas, plans and progress together in one peaceful place.</p>
+        <div class="brand-art" aria-hidden="true"><span class="shape shape-a"></span><span class="shape shape-b"></span><span class="shape shape-c"></span><span class="shape shape-d"></span></div>
+      </div>
+    </section>
+    <section class="form-section" aria-label="Account setup">
+      <div class="form-card" id="panel" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><span>© 2026 mildly</span><span>Made for the mildly patient.</span><button type="button" id="footerHelp">About this demo</button></footer>
+  <dialog id="infoDialog" class="info-dialog"><button type="button" class="dialog-close" id="closeDialog" aria-label="Close">×</button><h2>About this demo</h2><p>This is an interactive parody of familiar online signup rituals. Use a made-up email and password. Nothing you type is sent to a server or used to create an account.</p><button type="button" class="button button-primary" id="dialogOkay">Got it</button></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
